@@ -1,53 +1,63 @@
-# ingest.py — fetch historical bars and write per-symbol parquet
+# ingest.py
+
 import os
 import argparse
-from datetime import datetime, timedelta
+from pathlib import Path
+
 import pandas as pd
-from alpaca_trade_api.rest import REST
 from dotenv import load_dotenv
+from alpaca_trade_api.rest import REST, TimeFrame, URL
 
-load_dotenv()
+def fetch_and_save(symbol: str, client: REST, out_dir: Path):
+    print(f"→ fetching bars for {symbol}")
+    bars = client.get_bars(
+        symbol,
+        TimeFrame.Minute,
+        start="2020-01-01",
+        end=None,               # up to now
+        adjustment="raw"
+    ).df
+    # if you want a flat column for timestamp:
+    # bars = bars.reset_index().rename(columns={"timestamp": "time"})
+    path = out_dir / f"{symbol}.parquet"
+    bars.to_parquet(path)
+    print(f"✓ saved {path}")
 
-API_KEY = os.getenv("APCA_API_KEY_ID")
-API_SECRET = os.getenv("APCA_API_SECRET_KEY")
-BASE_URL = os.getenv("APCA_API_BASE_URL", "https://paper-api.alpaca.markets")
+def main(data_dir: str, symbols: list[str]):
+    load_dotenv()  # reads .env in cwd
+    api_key = os.getenv("APCA_API_KEY_ID")
+    api_secret = os.getenv("APCA_API_SECRET_KEY")
+    if not api_key or not api_secret:
+        raise RuntimeError("Missing APCA_API_KEY_ID / APCA_API_SECRET_KEY in .env")
 
-def fetch_and_save(symbols, start, end, timeframe, out_dir):
-    client = REST(API_KEY, API_SECRET, base_url=BASE_URL, api_version="v2")
-    os.makedirs(out_dir, exist_ok=True)
-    all_dfs = []
-    for symbol in symbols:
-        print(f"Fetching {symbol} from {start} to {end} @ {timeframe}")
-        bars = client.get_bars(symbol, timeframe, start=start, end=end).df
-        if bars.empty:
-            print(f"❗ no data for {symbol}")
-            continue
-        bars = bars.reset_index()
-        bars["symbol"] = symbol
-        path = os.path.join(out_dir, f"{symbol}.parquet")
-        bars.to_parquet(path)
-        all_dfs.append(path)
-    return all_dfs
+    # instantiate Alpaca REST client (paper trading/data)
+    client = REST(
+        api_key,
+        api_secret,
+        base_url=URL.PAPER,   # for paper-trading & data
+        api_version="v2"
+    )
+
+    out_dir = Path(data_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    for sym in symbols:
+        fetch_and_save(sym, client, out_dir)
 
 if __name__ == "__main__":
-    p = argparse.ArgumentParser()
-    p.add_argument("--symbols", nargs="+", required=True,
-                   help="List of symbols, e.g. --symbols AAPL MSFT GOOG")
-    p.add_argument("--start", type=str,
-                   help="Start ISO datetime, e.g. 2025-06-01T09:30:00Z")
-    p.add_argument("--end", type=str,
-                   help="End ISO datetime, e.g. 2025-06-10T16:00:00Z")
-    p.add_argument("--timeframe", default="1Min",
-                   help="Bar timeframe, e.g. 1Min, 5Min, 1Day")
-    p.add_argument("--data_dir", default="/inputs/stocks_data",
-                   help="Where to write parquet files")
-    args = p.parse_args()
-
-    # default last 2 weeks if not provided
-    if not args.end:
-        args.end = datetime.utcnow().isoformat()
-    if not args.start:
-        start_dt = datetime.fromisoformat(args.end.rstrip("Z")) - timedelta(days=14)
-        args.start = start_dt.isoformat() + "Z"
-
-    fetch_and_save(args.symbols, args.start, args.end, args.timeframe, args.data_dir)
+    parser = argparse.ArgumentParser(
+        description="Ingest historical bars from Alpaca into Parquet files"
+    )
+    parser.add_argument(
+        "--data_dir",
+        required=True,
+        help="Path where parquet files will be written (e.g. /inputs/stocks_data)"
+    )
+    parser.add_argument(
+        "--symbols",
+        nargs="+",
+        default=["AAPL"],
+        help="One or more ticker symbols to pull"
+    )
+    args = parser.parse_args()
+    main(args.data_dir, args.symbols)
