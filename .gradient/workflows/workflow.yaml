@@ -22,16 +22,20 @@ jobs:
       repo: CloneRepo.outputs.repo
       stocks_data:
         type: dataset
-        id: ds39mbittjyyz2q   # ← your dataset ID
+        id: YOUR_DATASET_ID_HERE    # ← replace with your ds39mbittjyyz2q ID
     uses: script@v1
     with:
       image: python:3.10
       script: |
+        # 1) install your deps
         pip install --upgrade pip
         pip install -r /inputs/repo/requirements.txt
 
-        cd /inputs/repo
+        # 2) fetch & save parquet
+        python /inputs/repo/ingest.py --data_dir /inputs/stocks_data
 
-        python ingest.py --data_dir /inputs/stocks_data
-        python trending_model.py --data_dir /inputs/stocks_data
+        # 3) backtest each file
+        python /inputs/repo/trending_model.py --data_dir /inputs/stocks_data
+
+        # 4) start your API (optional)
         uvicorn app:app --host 0.0.0.0 --port 8080
