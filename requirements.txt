@@ -6,4 +6,4 @@ joblib
 fastapi
 uvicorn
 tqdm
-bs4
+beautifulsoup4
