@@ -2,7 +2,6 @@ pandas
 numpy
 scikit-learn
 alpaca-trade-api
-alpaca-py
 backtesting
 fastapi
 uvicorn
