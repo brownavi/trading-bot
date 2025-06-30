@@ -1,11 +1,12 @@
+# ingest.py
 import os
 import argparse
 import pandas as pd
 from alpaca_trade_api.rest import REST, TimeFrame
 
 def fetch_symbol(symbol, start, end, out_folder):
-    api_key = os.getenv("APCA_API_KEY_ID")
-    secret  = os.getenv("APCA_API_SECRET_KEY")
+    api_key = os.getenv("PKL6RK0JSV4MT4E2JXRN")
+    secret  = os.getenv("gDC073gAxsB1S1Rcj5Q0c6EzFWuIXyHMBQDCpSDL")
     client = REST(api_key, secret, paper=True)
 
     bars = client.get_bars(symbol,
@@ -19,14 +20,13 @@ def fetch_symbol(symbol, start, end, out_folder):
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
-    p.add_argument("--data_dir", required=True,
-                   help="Path to mounted dataset (parquet output)")
+    p.add_argument("--data_dir", required=True)
     args = p.parse_args()
 
-    # Example: fetch AAPL last year
     from datetime import date, timedelta
-    end = date.today().isoformat()
+    end   = date.today().isoformat()
     start = (date.today() - timedelta(days=365)).isoformat()
 
-    fetch_symbol("AAPL", start, end, args.data_dir)
-    # add your other symbols here…
+    # example — add as many tickers as you like here
+    for sym in ["AAPL", "MSFT", "GOOG"]:
+        fetch_symbol(sym, start, end, args.data_dir)
