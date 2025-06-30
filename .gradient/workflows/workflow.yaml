@@ -1,10 +1,8 @@
-on:
+'on':
   github:
     branches:
       only: main
-
 jobs:
-  # 1) Clone your GitHub repo
   CloneRepo:
     resources:
       instance-type: C5
@@ -14,33 +12,14 @@ jobs:
     uses: git-checkout@v1
     with:
       url: context.event.github.url
-
-  # 2) Install dependencies from requirements.txt
-  SetupEnv:
-    needs: [CloneRepo]
+  HelloWorld:
     resources:
       instance-type: C5
+    needs:
+      - CloneRepo
     inputs:
       repo: CloneRepo.outputs.repo
     uses: script@v1
     with:
-      image: python:3.10
-      script: |
-        pip install --upgrade pip
-        pip install -r /inputs/repo/requirements.txt
-
-  # 3) Run your scripts (ingest, train, then launch FastAPI)
-  RunAll:
-    needs: [SetupEnv]
-    resources:
-      instance-type: C5
-    inputs:
-      repo: CloneRepo.outputs.repo
-    uses: script@v1
-    with:
-      image: python:3.10
-      script: |
-        python /inputs/repo/ingest.py
-        python /inputs/repo/trending_model.py
-        # finally, spin up your API on port 8080:
-        uvicorn app:app --host 0.0.0.0 --port 8080
+      script: python /inputs/repo/hello.py
+      image: tensorflow/tensorflow:1.14.0-py3
