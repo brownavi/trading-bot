@@ -1,41 +1,49 @@
+# .gradient/workflows/workflow.yaml
 on:
   github:
     branches:
       only: main
 
 jobs:
+  # 1) clone your GitHub repo
   CloneRepo:
+    uses: git-checkout@v1
     resources:
       instance-type: C5
     outputs:
       repo:
         type: volume
-    uses: git-checkout@v1
     with:
       url: context.event.github.url
 
+  # 2) run your entire pipeline
   RunAll:
     needs: [CloneRepo]
+    uses: script@v1
     resources:
       instance-type: C5
     inputs:
-      repo: CloneRepo.outputs.repo
+      # this is where your downloaded parquet will live
       stocks_data:
         type: dataset
-        id: YOUR_DATASET_ID_HERE   # ← your real dataset ID
-    uses: script@v1
+        id: ds39mbittjyyz2q
+      # this is your code
+      repo: CloneRepo.outputs.repo
     with:
       image: python:3.10
       script: |
+        # copy in your credentials (see below for .env)
+        cp /inputs/repo/.env .
+
+        # 1) upgrade pip & install all deps
         pip install --upgrade pip
         pip install -r /inputs/repo/requirements.txt
 
-        # ← specify your symbols here
-        python /inputs/repo/ingest.py \
-          --symbols AAPL MSFT GOOG \
-          --data_dir /inputs/stocks_data
+        # 2) pull raw data and write Parquet into /inputs/stocks_data/
+        python /inputs/repo/ingest.py --data_dir /inputs/stocks_data
 
-        python /inputs/repo/trending_model.py \
-          --data_dir /inputs/stocks_data
+        # 3) backtest/trending on ALL parquet files under that folder
+        python /inputs/repo/trending_model.py --data_dir /inputs/stocks_data
 
+        # 4) (optional) launch your API
         uvicorn app:app --host 0.0.0.0 --port 8080
