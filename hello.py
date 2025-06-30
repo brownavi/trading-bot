@@ -1,4 +1,11 @@
-# hello.py
+#save this file as hello.py in your repo
+import tensorflow as tf
 
-if __name__ == "__main__":
-    print("👋 Hello from your Gradient workflow!")
+# Simple hello world using TensorFlow
+hello = tf.constant('Hello, TensorFlow!')
+
+# Start tf session
+sess = tf.Session()
+
+# Run the op
+print(sess.run(hello))
