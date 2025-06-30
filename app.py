@@ -1,22 +1,24 @@
+# app.py — minimal FastAPI server to serve your signals
 import os
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+from typing import List
+from dotenv import load_dotenv
 
-app = FastAPI()
+load_dotenv()
 
-class BacktestResult(BaseModel):
-    stats: dict
+app = FastAPI(title="Trading Bot Signals")
 
-# Dummy in-memory store (swap for real DB or file)
-RESULTS = {}
-
-@app.post("/backtest/{symbol}")
-async def backtest(symbol: str):
-    key = symbol.upper()
-    if key not in RESULTS:
-        raise HTTPException(status_code=404, detail="No backtest for this symbol")
-    return BacktestResult(stats=RESULTS[key])
+class Signal(BaseModel):
+    symbol: str
+    position: str  # "long" or "short"
 
 @app.get("/health")
-async def health():
+def health():
     return {"status": "ok"}
+
+@app.post("/signals", response_model=List[Signal])
+def get_signals(symbols: List[str]):
+    # Placeholder: return dummy flat signals
+    return [Signal(symbol=s, position="flat") for s in symbols]
+
