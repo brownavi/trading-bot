@@ -1,51 +1,35 @@
 # trending_model.py
-import os, glob, argparse, pandas as pd
-from backtesting import Backtest, Strategy
+import os
+import argparse
+import pandas as pd
 
-class SmaCross(Strategy):
-    n1, n2 = 50, 200
-    def init(self):
-        price = self.data.Close
-        # rolling SMA
-        self.sma1 = self.I(lambda x: x.rolling(self.n1).mean(), price)
-        self.sma2 = self.I(lambda x: x.rolling(self.n2).mean(), price)
-    def next(self):
-        if self.sma1 > self.sma2:
-            self.buy()
-        elif self.sma1 < self.sma2:
-            self.sell()
-
-def run_backtests(data_dir):
-    files = glob.glob(os.path.join(data_dir, "*.parquet"))
+def load_data(data_dir):
+    files = [f for f in os.listdir(data_dir) if f.endswith(".parquet")]
     if not files:
-        print("⚠️  No parquet files found, skipping backtest.")
-        return
+        print(f"No parquet files found in {data_dir}.  Did ingestion run?")
+        return None
 
-    for fp in files:
-        df = pd.read_parquet(fp)
-        df.index = pd.to_datetime(df.index)
-        # rename columns for Backtesting lib:
-        df = df.rename(columns={
-            "open":  "Open",
-            "high":  "High",
-            "low":   "Low",
-            "close": "Close",
-            "volume":"Volume",
-        })[["Open","High","Low","Close","Volume"]]
+    dfs = []
+    for fn in files:
+        df = pd.read_parquet(os.path.join(data_dir, fn))
+        df["symbol"] = fn.replace(".parquet", "")
+        dfs.append(df)
+    return pd.concat(dfs, ignore_index=True)
 
-        print(f"\n--- {os.path.basename(fp)} ---")
-        bt = Backtest(
-            df,
-            SmaCross,
-            cash=10_000,
-            commission=0.002,
-            trade_on_close=True,
-            exclusive_orders=True
-        )
-        print(bt.run())
+def backtest(df):
+    # your existing backtest logic here
+    print("Running backtest on", df["symbol"].unique())
 
-if __name__ == "__main__":
+def main():
     p = argparse.ArgumentParser()
     p.add_argument("--data_dir", required=True)
     args = p.parse_args()
-    run_backtests(args.data_dir)
+
+    df = load_data(args.data_dir)
+    if df is None:
+        return
+
+    backtest(df)
+
+if __name__ == "__main__":
+    main()
