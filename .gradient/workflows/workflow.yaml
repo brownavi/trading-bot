@@ -22,7 +22,7 @@ jobs:
       repo: CloneRepo.outputs.repo
       stocks_data:
         type: dataset
-        id: ds39mbittjyyz2q    # ← your actual dataset ID here
+        id: ds39mbittjyyz2q:ic5t2sr    # ← your actual dataset ID here
     uses: script@v1
     with:
       image: python:3.10
