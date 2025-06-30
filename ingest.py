@@ -1,38 +1,24 @@
-# ingest.py
 import os
 import argparse
-from alpaca_trade_api.rest import REST, TimeFrame
-import pandas as pd
 from dotenv import load_dotenv
+from alpaca_trade_api.rest import REST
+import pandas as pd
 
-load_dotenv()  # so you can keep API keys in a .env file
-
-def fetch_and_save(symbols, data_dir, api_key, api_secret, base_url):
-    client = REST(api_key, api_secret, base_url)
-    os.makedirs(data_dir, exist_ok=True)
-    for sym in symbols:
-        # fetch last 100 daily bars
-        bars = client.get_bars(sym, TimeFrame.Day, limit=100).df
-        bars.index.name = 'timestamp'
-        file_path = os.path.join(data_dir, f"{sym}.parquet")
-        bars.to_parquet(file_path)
-        print(f"Saved {sym} → {file_path}")
-
-def main():
-    p = argparse.ArgumentParser()
-    p.add_argument("--data_dir", required=True,
-                   help="Directory where to write parquet files")
-    args = p.parse_args()
-
-    symbols = os.getenv("SYMBOLS", "AAPL,MSFT,GOOG").split(",")
+def fetch_data(symbols, data_dir):
+    load_dotenv()
     api_key = os.getenv("APCA_API_KEY_ID")
-    api_secret = os.getenv("APCA_API_SECRET_KEY")
-    base_url = os.getenv(
-        "APCA_API_BASE_URL", "https://paper-api.alpaca.markets"
-    )
-
-    fetch_and_save(symbols, args.data_dir, api_key, api_secret, base_url)
+    secret_key = os.getenv("APCA_API_SECRET_KEY")
+    client = REST(api_key, secret_key, base_url="https://paper-api.alpaca.markets")
+    os.makedirs(data_dir, exist_ok=True)
+    for symbol in symbols:
+        bars = client.get_bars(symbol, "1D", start="2025-06-01", end="2025-06-29").df
+        bars.to_parquet(f"{data_dir}/{symbol}.parquet")
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--data_dir", required=True, help="Path to write parquet files")
+    args = parser.parse_args()
 
+    # list your symbols (or load from file)
+    symbols = ["AAPL", "MSFT", "GOOG"]
+    fetch_data(symbols, args.data_dir)
