@@ -22,7 +22,7 @@ jobs:
       repo: CloneRepo.outputs.repo
       stocks_data:
         type: dataset
-        id: YOUR_DATASET_ID_HERE    # ← replace with your ds39mbittjyyz2q ID
+        id: ds39mbittjyyz2q    # ← your actual dataset ID here
     uses: script@v1
     with:
       image: python:3.10
@@ -37,5 +37,6 @@ jobs:
         # 3) backtest each file
         python /inputs/repo/trending_model.py --data_dir /inputs/stocks_data
 
-        # 4) start your API (optional)
+        # 4) (optional) spin up your API
         uvicorn app:app --host 0.0.0.0 --port 8080
+
