@@ -39,8 +39,8 @@ jobs:
         pip install --upgrade pip
         pip install -r /inputs/repo/requirements.txt
 
-        # 2) pull raw data and write Parquet into /inputs/stocks_data/
-        python /inputs/repo/ingest.py --data_dir /inputs/stocks_data
+        # 2) ingest minute bars into /inputs/stocks_data
+      python /inputs/repo/ingest.py --data_dir /inputs/stocks_data --symbols AAPL MSFT GOOGL
 
         # 3) backtest/trending on ALL parquet files under that folder
         python /inputs/repo/trending_model.py --data_dir /inputs/stocks_data
