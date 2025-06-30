@@ -1,0 +1,9 @@
+alpaca-trade-api>=2.0.0
+pandas
+numpy
+scikit-learn
+joblib
+fastapi
+uvicorn
+tqdm
+bs4
