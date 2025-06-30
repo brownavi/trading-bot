@@ -1,12 +1,31 @@
+on:
+  github:
+    branches:
+      only: main
+
+jobs:
+  CloneRepo:
+    resources:
+      instance-type: C5
+    outputs:
+      repo:
+        type: volume
+    uses: git-checkout@v1
+    with:
+      url: context.event.github.url
+
   RunAll:
     needs: [CloneRepo]
     resources:
       instance-type: C5
+    environment:
+      APCA_API_KEY_ID: ${{ secrets.APCA_API_KEY_ID }}
+      APCA_API_SECRET_KEY: ${{ secrets.APCA_API_SECRET_KEY }}
     inputs:
       repo: CloneRepo.outputs.repo
       stocks_data:
         type: dataset
-        id: ds39mbittjyyz2q   # ← replace with your actual dataset ID
+        id: ds39mbittjyyz2q   # ← replace with your dataset ID
     uses: script@v1
     with:
       image: python:3.10
@@ -14,10 +33,7 @@
         pip install --upgrade pip
         pip install -r /inputs/repo/requirements.txt
 
-        # make sure ingest writes into /inputs/stocks_data
         python /inputs/repo/ingest.py --data_dir /inputs/stocks_data
-
         python /inputs/repo/trending_model.py --data_dir /inputs/stocks_data
 
         uvicorn app:app --host 0.0.0.0 --port 8080
-
