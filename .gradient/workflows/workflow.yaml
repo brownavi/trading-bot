@@ -15,23 +15,30 @@ jobs:
     with:
       url: context.event.github.url
 
-  # 2) Install requirements & run your scripts
+  # 2) Run everything (with your dataset mounted)
   RunAll:
     needs: [CloneRepo]
-    inputs:
-      repo: CloneRepo.outputs.repo
     resources:
       instance-type: C5
+    inputs:
+      # the code volume
+      repo: CloneRepo.outputs.repo
+      # your Paperspace dataset mount (replace with your actual ID)
+      stocks_data:
+        type: dataset
+        id: ds39mbittjyyz2q
     uses: script@v1
     with:
-      # Use a Python image that has pip
       image: python:3.10
       script: |
-        # Upgrade pip and install all dependencies
+        # install everything
         pip install --upgrade pip
         pip install -r /inputs/repo/requirements.txt
 
-        # Run your ETL, modeling, and API startup (adjust as needed)
-        python /inputs/repo/ingest.py
-        python /inputs/repo/trending_model.py
+        # switch into your code directory
+        cd /inputs/repo
+
+        # run ETL, model, and API
+        python ingest.py --data_dir /inputs/stocks_data
+        python trending_model.py --data_dir /inputs/stocks_data
         uvicorn app:app --host 0.0.0.0 --port 8080
