@@ -1,35 +1,38 @@
 # ingest.py
 import os
 import argparse
-import pandas as pd
 from alpaca_trade_api.rest import REST, TimeFrame
+import pandas as pd
+from dotenv import load_dotenv
 
-def fetch_symbol(symbol, start, end, out_folder):
-    api_key = os.getenv("APCA_API_KEY_ID")
-    secret  = os.getenv("APCA_API_SECRET_KEY")
-    client = REST(api_key, secret, paper=True)
+load_dotenv()  # so you can keep API keys in a .env file
 
-    bars = (
-        client
-        .get_bars(symbol, TimeFrame.Day, start, end, adjustment="raw")
-        .df
-    )
-    path = os.path.join(out_folder, f"{symbol}.parquet")
-    bars.to_parquet(path)
-    print(f"✔ Wrote {symbol} → {path}")
+def fetch_and_save(symbols, data_dir, api_key, api_secret, base_url):
+    client = REST(api_key, api_secret, base_url)
+    os.makedirs(data_dir, exist_ok=True)
+    for sym in symbols:
+        # fetch last 100 daily bars
+        bars = client.get_bars(sym, TimeFrame.Day, limit=100).df
+        bars.index.name = 'timestamp'
+        file_path = os.path.join(data_dir, f"{sym}.parquet")
+        bars.to_parquet(file_path)
+        print(f"Saved {sym} → {file_path}")
 
-if __name__ == "__main__":
+def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--data_dir", required=True)
+    p.add_argument("--data_dir", required=True,
+                   help="Directory where to write parquet files")
     args = p.parse_args()
 
-    from datetime import date, timedelta
-    end   = date.today().isoformat()
-    start = (date.today() - timedelta(days=365)).isoformat()
+    symbols = os.getenv("SYMBOLS", "AAPL,MSFT,GOOG").split(",")
+    api_key = os.getenv("APCA_API_KEY_ID")
+    api_secret = os.getenv("APCA_API_SECRET_KEY")
+    base_url = os.getenv(
+        "APCA_API_BASE_URL", "https://paper-api.alpaca.markets"
+    )
 
-    # your universe of tickers:
-    symbols = ["AAPL", "MSFT", "GOOG"]
-    os.makedirs(args.data_dir, exist_ok=True)
+    fetch_and_save(symbols, args.data_dir, api_key, api_secret, base_url)
 
-    for sym in symbols:
-        fetch_symbol(sym, start, end, args.data_dir)
+if __name__ == "__main__":
+    main()
+
