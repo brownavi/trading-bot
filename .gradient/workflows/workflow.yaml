@@ -4,7 +4,6 @@ on:
       only: main
 
 jobs:
-  # 1) clone your code
   CloneRepo:
     resources:
       instance-type: C5
@@ -15,7 +14,6 @@ jobs:
     with:
       url: context.event.github.url
 
-  # 2) install dependencies
   SetupEnv:
     needs: [CloneRepo]
     resources:
@@ -29,7 +27,6 @@ jobs:
         pip install --upgrade pip
         pip install -r /inputs/repo/requirements.txt
 
-  # 3) pull data, train model, start app
   RunAll:
     needs: [SetupEnv]
     resources:
