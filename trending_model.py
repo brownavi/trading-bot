@@ -1,33 +1,41 @@
 import os
 import glob
+import argparse
 import pandas as pd
-from sklearn.linear_model import SGDClassifier
-from sklearn.preprocessing import StandardScaler
-from sklearn.pipeline import make_pipeline
-from joblib import dump
+from backtesting import Backtest, Strategy
 
-DATA_FOLDER = 'data/history'
-MODEL_PATH = 'models/trend_model.joblib'
-os.makedirs('models', exist_ok=True)
+class SmaCross(Strategy):
+    n1, n2 = 50, 200
+    def init(self):
+        price = self.data.Close
+        self.sma1 = self.I(lambda x: x.rolling(self.n1).mean(), price)
+        self.sma2 = self.I(lambda x: x.rolling(self.n2).mean(), price)
+    def next(self):
+        if self.sma1 > self.sma2:
+            self.buy()
+        elif self.sma1 < self.sma2:
+            self.sell()
 
-def load_data():
-    files = glob.glob(f"{DATA_FOLDER}/*.parquet")
-    dfs = []
+def run_backtests(data_dir):
+    files = glob.glob(os.path.join(data_dir, "*.parquet"))
+    if not files:
+        print("⚠️ No parquet files found, skipping backtest.")
+        return
+
     for fp in files:
         df = pd.read_parquet(fp)
-        if len(df) >= 100:
-            df = df[['open','high','low','close','volume']].copy()
-            df['symbol'] = os.path.splitext(os.path.basename(fp))[0]
-            # simple feature + target: close > open
-            df['target'] = (df['close'] > df['open']).astype(int)
-            dfs.append(df)
-    return pd.concat(dfs, ignore_index=True)
+        df.index = pd.to_datetime(df.index)
+        df = df[["open", "high", "low", "close", "volume"]]
+        symbol = os.path.basename(fp).replace(".parquet", "")
+        print(f"\n--- Backtesting {symbol} ---")
+        bt = Backtest(df, SmaCross, cash=10_000, commission=0.002,
+                      trade_on_close=True, exclusive_orders=True)
+        stats = bt.run()
+        print(stats)
 
-if __name__ == '__main__':
-    df = load_data()
-    X = df[['open','high','low','close','volume']]
-    y = df['target']
-    pipe = make_pipeline(StandardScaler(), SGDClassifier(max_iter=1000, tol=1e-3))
-    pipe.fit(X, y)
-    dump(pipe, MODEL_PATH)
-    print(f"Trained model saved to {MODEL_PATH}")
+if __name__ == "__main__":
+    p = argparse.ArgumentParser()
+    p.add_argument("--data_dir", required=True,
+                   help="Path to mounted dataset (parquet input)")
+    args = p.parse_args()
+    run_backtests(args.data_dir)
