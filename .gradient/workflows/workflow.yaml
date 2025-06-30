@@ -18,22 +18,26 @@ jobs:
     needs: [CloneRepo]
     resources:
       instance-type: C5
-    environment:
-      APCA_API_KEY_ID: ${{ secrets.APCA_API_KEY_ID }}
-      APCA_API_SECRET_KEY: ${{ secrets.APCA_API_SECRET_KEY }}
     inputs:
       repo: CloneRepo.outputs.repo
       stocks_data:
         type: dataset
-        id: ds39mbittjyyz2q   # ← replace with your dataset ID
+        id: YOUR_DATASET_ID_HERE   # ← swap in your dataset ID
     uses: script@v1
     with:
       image: python:3.10
       script: |
+        # 1) load env & install
         pip install --upgrade pip
         pip install -r /inputs/repo/requirements.txt
 
-        python /inputs/repo/ingest.py --data_dir /inputs/stocks_data
+        # 2) fetch raw data
+        python /inputs/repo/ingest.py \
+          --symbols AAPL MSFT GOOG \
+          --data_dir /inputs/stocks_data
+
+        # 3) run backtests
         python /inputs/repo/trending_model.py --data_dir /inputs/stocks_data
 
+        # 4) optional: start API for on-demand signals
         uvicorn app:app --host 0.0.0.0 --port 8080
