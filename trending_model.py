@@ -1,22 +1,19 @@
+# trending_model.py — load each symbol’s parquet and backtest
 import os
 import argparse
 import pandas as pd
 from backtesting import Backtest, Strategy
 from backtesting.lib import crossover
-from backtesting.test import SMA
+import numpy as np
 
-def load_data(data_dir):
-    files = [f for f in os.listdir(data_dir) if f.endswith('.parquet')]
-    if not files:
-        raise ValueError("No parquet files found in data_dir")
-    dfs = [pd.read_parquet(os.path.join(data_dir, f)) for f in files]
-    # assume each DF has Date, Open, High, Low, Close, Volume
-    return pd.concat(dfs, ignore_index=True)
+class SMAStrategy(Strategy):
+    n1 = 10
+    n2 = 30
 
-class SmaCross(Strategy):
     def init(self):
-        self.sma1 = self.I(SMA, self.data.Close, 10)
-        self.sma2 = self.I(SMA, self.data.Close, 20)
+        price = self.data.Close
+        self.sma1 = self.I(pd.Series.rolling, price, self.n1).mean()
+        self.sma2 = self.I(pd.Series.rolling, price, self.n2).mean()
 
     def next(self):
         if crossover(self.sma1, self.sma2):
@@ -24,12 +21,28 @@ class SmaCross(Strategy):
         elif crossover(self.sma2, self.sma1):
             self.sell()
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--data_dir", required=True)
-    args = parser.parse_args()
-
-    df = load_data(args.data_dir)
-    bt = Backtest(df, SmaCross, cash=10000, commission=.002)
+def backtest_file(path, cash=10_000):
+    df = pd.read_parquet(path).set_index("timestamp")
+    bt = Backtest(df, SMAStrategy, cash=cash, commission=0.001)
     stats = bt.run()
-    print(stats)
+    print(f"=== {os.path.basename(path)} ===")
+    print(stats[["Return [%]", "Sharpe Ratio", "Max Drawdown [%]"]])
+    # Optionally save equity curve
+    # stats._equity.to_csv(f"{path}.equity.csv")
+
+if __name__ == "__main__":
+    p = argparse.ArgumentParser()
+    p.add_argument("--data_dir", required=True,
+                   help="Directory of parquet files")
+    args = p.parse_args()
+
+    files = [
+        os.path.join(args.data_dir, f)
+        for f in os.listdir(args.data_dir)
+        if f.endswith(".parquet")
+    ]
+    if not files:
+        raise ValueError("No parquet files found in " + args.data_dir)
+
+    for f in files:
+        backtest_file(f)
