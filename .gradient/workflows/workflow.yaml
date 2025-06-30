@@ -22,22 +22,20 @@ jobs:
       repo: CloneRepo.outputs.repo
       stocks_data:
         type: dataset
-        id: YOUR_DATASET_ID_HERE   # ← swap in your dataset ID
+        id: YOUR_DATASET_ID_HERE   # ← your real dataset ID
     uses: script@v1
     with:
       image: python:3.10
       script: |
-        # 1) load env & install
         pip install --upgrade pip
         pip install -r /inputs/repo/requirements.txt
 
-        # 2) fetch raw data
+        # ← specify your symbols here
         python /inputs/repo/ingest.py \
           --symbols AAPL MSFT GOOG \
           --data_dir /inputs/stocks_data
 
-        # 3) run backtests
-        python /inputs/repo/trending_model.py --data_dir /inputs/stocks_data
+        python /inputs/repo/trending_model.py \
+          --data_dir /inputs/stocks_data
 
-        # 4) optional: start API for on-demand signals
         uvicorn app:app --host 0.0.0.0 --port 8080
