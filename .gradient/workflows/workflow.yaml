@@ -1,60 +1,25 @@
-on:
+'on':
   github:
     branches:
       only: main
-
 jobs:
-  # 1️⃣  Clone the repo into a shared volume
   CloneRepo:
-    uses: git-checkout@v1
     resources:
       instance-type: C5
     outputs:
       repo:
         type: volume
+    uses: git-checkout@v1
     with:
       url: context.event.github.url
-
-  # 2️⃣  Ingest historical data
-  IngestData:
-    needs: [CloneRepo]
-    uses: script@v1
+  HelloWorld:
     resources:
       instance-type: C5
+    needs:
+      - CloneRepo
     inputs:
       repo: CloneRepo.outputs.repo
-    with:
-      # run your ingestion script
-      script: |
-        pip install --no-cache-dir alpaca-py pandas lxml html5lib
-        python /inputs/repo/ingest.py
-      image: python:3.11
-
-  # 3️⃣  Train or update your trending model
-  TrainModel:
-    needs: [IngestData]
     uses: script@v1
-    # if your model needs a GPU, switch instance-type and add `gpu: T4` (or similar)
-    resources:
-      instance-type: C5
-    inputs:
-      repo: CloneRepo.outputs.repo
     with:
-      script: |
-        pip install --no-cache-dir scikit-learn numpy pandas
-        python /inputs/repo/trending_model.py
-      image: python:3.11
-
-  # 4️⃣  Deploy or test your live trading app
-  DeployApp:
-    needs: [TrainModel]
-    uses: script@v1
-    resources:
-      instance-type: C5
-    inputs:
-      repo: CloneRepo.outputs.repo
-    with:
-      script: |
-        pip install --no-cache-dir alpaca-py
-        python /inputs/repo/app.py
-      image: python:3.11
+      script: python /inputs/repo/hello.py
+      image: tensorflow/tensorflow:1.14.0-py3
