@@ -1,10 +1,9 @@
-on:
+'on':
   github:
     branches:
       only: main
-
 jobs:
-  Clone:
+  CloneRepo:
     resources:
       instance-type: C5
     outputs:
@@ -13,37 +12,14 @@ jobs:
     uses: git-checkout@v1
     with:
       url: context.event.github.url
-
-  IngestData:
-    needs:
-      - Clone
+  HelloWorld:
     resources:
       instance-type: C5
-    inputs:
-      repo: Clone.outputs.repo
-    uses: script@v1
-    with:
-      script: python /inputs/repo/ingest.py
-
-  TrainModel:
     needs:
-      - IngestData
-    resources:
-      instance-type: C5
+      - CloneRepo
     inputs:
-      repo: Clone.outputs.repo
+      repo: CloneRepo.outputs.repo
     uses: script@v1
     with:
-      script: python /inputs/repo/trending_model.py
-
-  Serve:
-    needs:
-      - TrainModel
-    resources:
-      instance-type: C5
-    inputs:
-      repo: Clone.outputs.repo
-    uses: script@v1
-    with:
-      script: python /inputs/repo/app.py
-      # you can swap out to a container step if you built a Docker image
+      script: python /inputs/repo/hello.py
+      image: tensorflow/tensorflow:1.14.0-py3
