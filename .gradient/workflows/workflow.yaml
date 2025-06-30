@@ -4,7 +4,6 @@ on:
       only: main
 
 jobs:
-  # 1) Clone your GitHub repo
   CloneRepo:
     resources:
       instance-type: C5
@@ -15,30 +14,24 @@ jobs:
     with:
       url: context.event.github.url
 
-  # 2) Run everything (with your dataset mounted)
   RunAll:
     needs: [CloneRepo]
     resources:
       instance-type: C5
     inputs:
-      # the code volume
       repo: CloneRepo.outputs.repo
-      # your Paperspace dataset mount (replace with your actual ID)
       stocks_data:
         type: dataset
-        id: ds39mbittjyyz2q
+        id: ds39mbittjyyz2q   # ← your dataset ID
     uses: script@v1
     with:
       image: python:3.10
       script: |
-        # install everything
         pip install --upgrade pip
         pip install -r /inputs/repo/requirements.txt
 
-        # switch into your code directory
         cd /inputs/repo
 
-        # run ETL, model, and API
         python ingest.py --data_dir /inputs/stocks_data
         python trending_model.py --data_dir /inputs/stocks_data
         uvicorn app:app --host 0.0.0.0 --port 8080
