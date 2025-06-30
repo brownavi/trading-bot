@@ -4,6 +4,7 @@ on:
       only: main
 
 jobs:
+  # 1) clone your code
   CloneRepo:
     resources:
       instance-type: C5
@@ -14,9 +15,9 @@ jobs:
     with:
       url: context.event.github.url
 
-  Ingest:
-    needs:
-      - CloneRepo
+  # 2) install dependencies
+  SetupEnv:
+    needs: [CloneRepo]
     resources:
       instance-type: C5
     inputs:
@@ -25,33 +26,20 @@ jobs:
     with:
       image: python:3.10
       script: |
+        pip install --upgrade pip
         pip install -r /inputs/repo/requirements.txt
+
+  # 3) pull data, train model, start app
+  RunAll:
+    needs: [SetupEnv]
+    resources:
+      instance-type: C5
+    inputs:
+      repo: CloneRepo.outputs.repo
+    uses: script@v1
+    with:
+      image: python:3.10
+      script: |
         python /inputs/repo/ingest.py
-
-  TrainTrend:
-    needs:
-      - Ingest
-    resources:
-      instance-type: C5
-    inputs:
-      repo: CloneRepo.outputs.repo
-    uses: script@v1
-    with:
-      image: python:3.10
-      script: |
-        pip install -r /inputs/repo/requirements.txt
         python /inputs/repo/trending_model.py
-
-  ServeApp:
-    needs:
-      - TrainTrend
-    resources:
-      instance-type: C5
-    inputs:
-      repo: CloneRepo.outputs.repo
-    uses: script@v1
-    with:
-      image: python:3.10
-      script: |
-        pip install -r /inputs/repo/requirements.txt
-        python /inputs/repo/app.py
+        uvicorn app:app --host 0.0.0.0 --port 8080
