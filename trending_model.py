@@ -6,27 +6,42 @@ class SmaCross(Strategy):
     n1, n2 = 50, 200
     def init(self):
         price = self.data.Close
+        # rolling SMA
         self.sma1 = self.I(lambda x: x.rolling(self.n1).mean(), price)
         self.sma2 = self.I(lambda x: x.rolling(self.n2).mean(), price)
     def next(self):
-        if self.sma1 > self.sma2: self.buy()
-        elif self.sma1 < self.sma2: self.sell()
+        if self.sma1 > self.sma2:
+            self.buy()
+        elif self.sma1 < self.sma2:
+            self.sell()
 
 def run_backtests(data_dir):
     files = glob.glob(os.path.join(data_dir, "*.parquet"))
     if not files:
-        print("⚠️ No parquet files found, skipping backtest.")
+        print("⚠️  No parquet files found, skipping backtest.")
         return
 
     for fp in files:
         df = pd.read_parquet(fp)
         df.index = pd.to_datetime(df.index)
-        df = df[["open","high","low","close","volume"]]
+        # rename columns for Backtesting lib:
+        df = df.rename(columns={
+            "open":  "Open",
+            "high":  "High",
+            "low":   "Low",
+            "close": "Close",
+            "volume":"Volume",
+        })[["Open","High","Low","Close","Volume"]]
+
         print(f"\n--- {os.path.basename(fp)} ---")
-        bt = Backtest(df, SmaCross, cash=10_000,
-                      commission=0.002,
-                      trade_on_close=True,
-                      exclusive_orders=True)
+        bt = Backtest(
+            df,
+            SmaCross,
+            cash=10_000,
+            commission=0.002,
+            trade_on_close=True,
+            exclusive_orders=True
+        )
         print(bt.run())
 
 if __name__ == "__main__":
