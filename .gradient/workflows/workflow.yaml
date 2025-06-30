@@ -1,25 +1,30 @@
-'on':
+on:
   github:
     branches:
-      only: main
+      only: main   # (or whatever your default branch is)
+
 jobs:
   CloneRepo:
+    uses: git-checkout@v1
     resources:
       instance-type: C5
     outputs:
       repo:
         type: volume
-    uses: git-checkout@v1
     with:
       url: context.event.github.url
-  HelloWorld:
+
+  RunAll:
+    needs: [CloneRepo]
+    uses: script@v1
     resources:
       instance-type: C5
-    needs:
-      - CloneRepo
     inputs:
       repo: CloneRepo.outputs.repo
-    uses: script@v1
     with:
-      script: python /inputs/repo/hello.py
-      image: tensorflow/tensorflow:1.14.0-py3
+      image: python:3.10
+      script: |
+        pip install -r /inputs/repo/requirements.txt
+        python /inputs/repo/ingest.py
+        python /inputs/repo/trending_model.py
+        python /inputs/repo/app.py
