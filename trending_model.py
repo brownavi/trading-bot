@@ -1,48 +1,88 @@
-# trending_model.py — load each symbol’s parquet and backtest
-import os
+# trending_model.py
+
 import argparse
+from pathlib import Path
+
 import pandas as pd
 from backtesting import Backtest, Strategy
 from backtesting.lib import crossover
-import numpy as np
 
-class SMAStrategy(Strategy):
+class SMACross(Strategy):
+    # fast & slow lookback windows
     n1 = 10
-    n2 = 30
+    n2 = 60
 
     def init(self):
         price = self.data.Close
-        self.sma1 = self.I(pd.Series.rolling, price, self.n1).mean()
-        self.sma2 = self.I(pd.Series.rolling, price, self.n2).mean()
+        # compute short & long SMAs
+        self.sma1 = self.I(lambda x: x.rolling(self.n1).mean(), price)
+        self.sma2 = self.I(lambda x: x.rolling(self.n2).mean(), price)
 
     def next(self):
+        # if short crosses above long → go long
         if crossover(self.sma1, self.sma2):
             self.buy()
+        # if long crosses above short → go short/exit
         elif crossover(self.sma2, self.sma1):
             self.sell()
 
-def backtest_file(path, cash=10_000):
-    df = pd.read_parquet(path).set_index("timestamp")
-    bt = Backtest(df, SMAStrategy, cash=cash, commission=0.001)
+def run_backtest(file_path: Path):
+    symbol = file_path.stem
+    print(f"\n→ Backtesting {symbol}")
+
+    # load data
+    df = pd.read_parquet(file_path)
+    # ensure DateTimeIndex
+    if not isinstance(df.index, pd.DatetimeIndex):
+        df.index = pd.to_datetime(df.index)
+
+    # select and rename columns for backtesting.py
+    df = (
+        df[["open","high","low","close","volume"]]
+        .rename(columns=str.title)
+    )
+
+    bt = Backtest(
+        df,
+        SMACross,
+        cash=10_000,
+        commission=0.001,
+        exclusive_orders=True
+    )
     stats = bt.run()
-    print(f"=== {os.path.basename(path)} ===")
-    print(stats[["Return [%]", "Sharpe Ratio", "Max Drawdown [%]"]])
-    # Optionally save equity curve
-    # stats._equity.to_csv(f"{path}.equity.csv")
+    print(f"  Return [%]:    {stats['Return [%]']:.2f}")
+    print(f"  Win rate [%]:  {stats['Win rate [%]']:.1f}")
+    print(f"  Sharpe Ratio:  {stats['Sharpe Ratio']:.2f}")
+    return stats
+
+def main(data_dir: str):
+    data_path = Path(data_dir)
+    files = sorted(data_path.glob("*.parquet"))
+    if not files:
+        print(f"No parquet files found in {data_dir}")
+        return
+
+    all_stats = []
+    for f in files:
+        stats = run_backtest(f)
+        all_stats.append((f.stem, stats))
+
+    # optional summary table
+    print("\n=== SUMMARY ===")
+    for sym, s in all_stats:
+        print(
+            f"{sym:6}  Return {s['Return [%]']:.1f}%   "
+            f"Win {s['Win rate [%]']:.1f}%   Sharpe {s['Sharpe Ratio']:.2f}"
+        )
 
 if __name__ == "__main__":
-    p = argparse.ArgumentParser()
-    p.add_argument("--data_dir", required=True,
-                   help="Directory of parquet files")
-    args = p.parse_args()
-
-    files = [
-        os.path.join(args.data_dir, f)
-        for f in os.listdir(args.data_dir)
-        if f.endswith(".parquet")
-    ]
-    if not files:
-        raise ValueError("No parquet files found in " + args.data_dir)
-
-    for f in files:
-        backtest_file(f)
+    parser = argparse.ArgumentParser(
+        description="Run SMA‐crossover backtests on all Parquet files in a folder"
+    )
+    parser.add_argument(
+        "--data_dir",
+        required=True,
+        help="Folder where your Parquet bars were written (e.g. /inputs/stocks_data)"
+    )
+    args = parser.parse_args()
+    main(args.data_dir)
