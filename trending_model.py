@@ -1,35 +1,35 @@
-# trending_model.py
 import os
 import argparse
 import pandas as pd
+from backtesting import Backtest, Strategy
+from backtesting.lib import crossover
+from backtesting.test import SMA
 
 def load_data(data_dir):
-    files = [f for f in os.listdir(data_dir) if f.endswith(".parquet")]
+    files = [f for f in os.listdir(data_dir) if f.endswith('.parquet')]
     if not files:
-        print(f"No parquet files found in {data_dir}.  Did ingestion run?")
-        return None
-
-    dfs = []
-    for fn in files:
-        df = pd.read_parquet(os.path.join(data_dir, fn))
-        df["symbol"] = fn.replace(".parquet", "")
-        dfs.append(df)
+        raise ValueError("No parquet files found in data_dir")
+    dfs = [pd.read_parquet(os.path.join(data_dir, f)) for f in files]
+    # assume each DF has Date, Open, High, Low, Close, Volume
     return pd.concat(dfs, ignore_index=True)
 
-def backtest(df):
-    # your existing backtest logic here
-    print("Running backtest on", df["symbol"].unique())
+class SmaCross(Strategy):
+    def init(self):
+        self.sma1 = self.I(SMA, self.data.Close, 10)
+        self.sma2 = self.I(SMA, self.data.Close, 20)
 
-def main():
-    p = argparse.ArgumentParser()
-    p.add_argument("--data_dir", required=True)
-    args = p.parse_args()
+    def next(self):
+        if crossover(self.sma1, self.sma2):
+            self.buy()
+        elif crossover(self.sma2, self.sma1):
+            self.sell()
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--data_dir", required=True)
+    args = parser.parse_args()
 
     df = load_data(args.data_dir)
-    if df is None:
-        return
-
-    backtest(df)
-
-if __name__ == "__main__":
-    main()
+    bt = Backtest(df, SmaCross, cash=10000, commission=.002)
+    stats = bt.run()
+    print(stats)
